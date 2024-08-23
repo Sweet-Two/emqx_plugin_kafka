@@ -324,7 +324,7 @@ kafka_init(_Env) ->
        IsSpecificBridge == false -> 
        ok = brod:start_producer(emqx_repost_worker, KafkaTopic, []);
        IsSpecificBridge == true -> 
-       ok = brod:start_producer(emqx_repost_worker, specificKafkaTopic, [])
+       ok = brod:start_producer(emqx_repost_worker, SpecificKafkaTopic, [])
   end,
  
   ?LOG_INFO("Init emqx plugin kafka successfully.....~n"),
