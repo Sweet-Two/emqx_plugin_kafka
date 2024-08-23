@@ -107,7 +107,13 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
     {ts, Now},
     {online, Online}
   ],
-  produce_kafka_payload(ClientId, Payload),
+  IsSpecificBridge = is_Specific_bridge(),
+  if
+    IsSpecificBridge == true ->
+      produce_specify_payload(ClientId, Payload);
+    IsSpecificBridge == false ->
+      produce_kafka_payload(ClientId, Payload)
+  end,
   ok.
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
@@ -124,7 +130,13 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
     {ts, Now},
     {online, Online}
   ],
-  produce_kafka_payload(ClientId, Payload),
+  IsSpecificBridge = is_Specific_bridge(),
+  if
+    IsSpecificBridge == true ->
+      produce_specify_payload(ClientId, Payload);
+    IsSpecificBridge == false ->
+      produce_kafka_payload(ClientId, Payload)
+  end,
   ok.
 
 on_client_authenticate(_ClientInfo = #{clientid := ClientId}, Result, _Env) ->
@@ -150,8 +162,13 @@ on_client_subscribe(#{clientid := ClientId}, _Properties, TopicFilters, _Env) ->
     {qos, maps:get(qos, Qos)},
     {ts, Now}
   ],
-  produce_kafka_payload(ClientId, Payload),
+  IsSpecificBridge = is_Specific_bridge(),
+  if
+    IsSpecificBridge == false ->
+      produce_kafka_payload(ClientId, Payload)
+  end,
   ok.
+
 %%---------------------client subscribe stop----------------------%%
 on_client_unsubscribe(#{clientid := ClientId}, _Properties, TopicFilters, _Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]Client(~s) will unsubscribe ~p~n", [ClientId, TopicFilters]),
@@ -164,7 +181,11 @@ on_client_unsubscribe(#{clientid := ClientId}, _Properties, TopicFilters, _Env) 
     {topic, Topic},
     {ts, Now}
   ],
-  produce_kafka_payload(ClientId, Payload),
+  IsSpecificBridge = is_Specific_bridge(),
+  if
+    IsSpecificBridge == false ->
+      produce_kafka_payload(ClientId, Payload)
+  end,
   ok.
 
 on_message_dropped(#message{topic = <<"$SYS/", _/binary>>}, _By, _Reason, _Env) ->
@@ -180,7 +201,25 @@ on_message_publish(Message = #message{topic = <<"$SYS/", _/binary>>}, _Env) ->
   ok;
 on_message_publish(Message, _Env) ->
   {ok, ClientId, Payload} = format_payload(Message),
-  produce_kafka_payload(ClientId, Payload),
+  Topic = Message#message.topic,
+  IsSpecificBridge = is_Specific_bridge(),
+  if
+    IsSpecificBridge == true ->
+      {ok, Bridge_Topic_1} = application:get_env(emqx_plugin_kafka, bridge_mqtt_topic_1),
+      {ok, Bridge_Topic_2} = application:get_env(emqx_plugin_kafka, bridge_mqtt_topic_2),
+      case string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_1)) of
+          Bridge_Topic_1 -> 
+          produce_specify_payload(ClientId, Payload) 
+      end,
+      case string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_2)) of
+          Bridge_Topic_2 ->  
+          produce_specify_payload(ClientId, Payload) 
+      end;
+      
+    IsSpecificBridge == false ->
+      produce_kafka_payload(ClientId, Payload) 
+
+  end,
   ok.
 %%---------------------message publish stop----------------------%%
 
@@ -202,7 +241,11 @@ on_message_delivered(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
     {cluster_node, node()},
     {ts, Timestamp}
   ],
-  produce_kafka_payload(ClientId, Content),
+  IsSpecificBridge = is_Specific_bridge(),
+  if
+    IsSpecificBridge == false ->
+      produce_kafka_payload(ClientId, Content)
+  end,
   ok.
 
 on_message_acked(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
@@ -223,7 +266,11 @@ on_message_acked(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
     {cluster_node, node()},
     {ts, Timestamp}
   ],
-  produce_kafka_payload(ClientId, Content),
+  IsSpecificBridge = is_Specific_bridge(),
+  if
+    IsSpecificBridge == false ->
+      produce_kafka_payload(ClientId, Content)
+  end,
   ok.
 
 %%--------------------------------------------------------------------
@@ -268,15 +315,28 @@ kafka_init(_Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]KafkaConfig = ~p~n", [KafkaConfig]),
   {ok, KafkaTopic} = application:get_env(emqx_plugin_kafka, topic),
   ?LOG_INFO("[KAFKA PLUGIN]KafkaTopic = ~s~n", [KafkaTopic]),
+  {ok, IsSpecificBridge} = application:get_env(emqx_plugin_kafka, isSpecificBridge),
+  {ok, specificKafkaTopic} = application:get_env(emqx_plugin_kafka, specificKafkaTopic),
+  ?LOG_INFO("[KAFKA PLUGIN]SpecificKafkaTopic = ~s~n", [specificKafkaTopic]),
   {ok, _} = application:ensure_all_started(brod),
   ok = brod:start_client(AddressList, emqx_repost_worker, KafkaConfig),
-  ok = brod:start_producer(emqx_repost_worker, KafkaTopic, []),
+  if 
+       IsSpecificBridge == false -> 
+       ok = brod:start_producer(emqx_repost_worker, KafkaTopic, []);
+       IsSpecificBridge == true -> 
+       ok = brod:start_producer(emqx_repost_worker, specificKafkaTopic, [])
+  end,
+ 
   ?LOG_INFO("Init emqx plugin kafka successfully.....~n"),
   ok.
 
 get_kafka_topic() ->
   {ok, Topic} = application:get_env(emqx_plugin_kafka, topic),
   Topic.
+
+is_Specific_bridge() ->
+  {ok, IsSpecificBridge} = application:get_env(emqx_plugin_kafka, isSpecificBridge),
+  IsSpecificBridge.
 
 need_base64() ->
   {ok, NeedBase64} = application:get_env(emqx_plugin_kafka, publish_base64),
@@ -337,6 +397,14 @@ produce_kafka_payload(Key, Message) ->
   % ?LOG_INFO("[KAFKA PLUGIN]Message = ~s~n",[MessageBody]),
   Payload = iolist_to_binary(MessageBody),
   brod:produce_cb(emqx_repost_worker, Topic, hash, Key, Payload, fun(_,_) -> ok end),
+  ok.
+
+produce_specify_payload(Key, Message) ->
+  {ok, SpecificTopic} = application:get_env(emqx_plugin_kafka, specificTopic),
+  {ok, MessageBody} = emqx_json:safe_encode(Message),
+  % ?LOG_INFO("[KAFKA PLUGIN]Message = ~s~n",[MessageBody]),
+  Payload = iolist_to_binary(MessageBody),
+  brod:produce_cb(emqx_repost_worker, SpecificTopic, hash, Key, Payload, fun(_,_) -> ok end),
   ok.
 
 ntoa({0, 0, 0, 0, 0, 16#ffff, AB, CD}) ->
