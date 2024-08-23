@@ -400,11 +400,11 @@ produce_kafka_payload(Key, Message) ->
   ok.
 
 produce_specify_payload(Key, Message) ->
-  {ok, SpecificTopic} = application:get_env(emqx_plugin_kafka, specificTopic),
+  {ok, SpecificKafkaTopic} = application:get_env(emqx_plugin_kafka, specificKafkaTopic),
   {ok, MessageBody} = emqx_json:safe_encode(Message),
   % ?LOG_INFO("[KAFKA PLUGIN]Message = ~s~n",[MessageBody]),
   Payload = iolist_to_binary(MessageBody),
-  brod:produce_cb(emqx_repost_worker, SpecificTopic, hash, Key, Payload, fun(_,_) -> ok end),
+  brod:produce_cb(emqx_repost_worker, SpecificKafkaTopic, hash, Key, Payload, fun(_,_) -> ok end),
   ok.
 
 ntoa({0, 0, 0, 0, 0, 16#ffff, AB, CD}) ->
