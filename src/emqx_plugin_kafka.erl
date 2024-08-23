@@ -316,8 +316,8 @@ kafka_init(_Env) ->
   {ok, KafkaTopic} = application:get_env(emqx_plugin_kafka, topic),
   ?LOG_INFO("[KAFKA PLUGIN]KafkaTopic = ~s~n", [KafkaTopic]),
   {ok, IsSpecificBridge} = application:get_env(emqx_plugin_kafka, isSpecificBridge),
-  {ok, specificKafkaTopic} = application:get_env(emqx_plugin_kafka, specificKafkaTopic),
-  ?LOG_INFO("[KAFKA PLUGIN]SpecificKafkaTopic = ~s~n", [specificKafkaTopic]),
+  {ok, SpecificKafkaTopic} = application:get_env(emqx_plugin_kafka, specificKafkaTopic),
+  ?LOG_INFO("[KAFKA PLUGIN]SpecificKafkaTopic = ~s~n", [SpecificKafkaTopic]),
   {ok, _} = application:ensure_all_started(brod),
   ok = brod:start_client(AddressList, emqx_repost_worker, KafkaConfig),
   if 
