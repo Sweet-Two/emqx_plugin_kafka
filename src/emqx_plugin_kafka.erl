@@ -111,7 +111,7 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
   if
     IsSpecificBridge == true ->
       produce_specify_payload(ClientId, Payload);
-    IsSpecificBridge == false ->
+    true ->
       produce_kafka_payload(ClientId, Payload)
   end,
   ok.
@@ -134,7 +134,7 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
   if
     IsSpecificBridge == true ->
       produce_specify_payload(ClientId, Payload);
-    IsSpecificBridge == false ->
+    true ->
       produce_kafka_payload(ClientId, Payload)
   end,
   ok.
@@ -165,7 +165,9 @@ on_client_subscribe(#{clientid := ClientId}, _Properties, TopicFilters, _Env) ->
   IsSpecificBridge = is_Specific_bridge(),
   if
     IsSpecificBridge == false ->
-      produce_kafka_payload(ClientId, Payload)
+      produce_kafka_payload(ClientId, Payload);
+    true->
+      ?LOG_INFO("[KAFKA PLUGIN]The subscribe operation is not bridge,client(~s),Topic: ~p~n", [ClientId, TopicFilters])
   end,
   ok.
 
@@ -184,7 +186,9 @@ on_client_unsubscribe(#{clientid := ClientId}, _Properties, TopicFilters, _Env) 
   IsSpecificBridge = is_Specific_bridge(),
   if
     IsSpecificBridge == false ->
-      produce_kafka_payload(ClientId, Payload)
+      produce_kafka_payload(ClientId, Payload);
+    true->
+      ?LOG_INFO("[KAFKA PLUGIN]The unsubscribe operation is not bridge,client(~s),Topic: ~p~n", [ClientId, TopicFilters])
   end,
   ok.
 
@@ -244,7 +248,9 @@ on_message_delivered(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
   IsSpecificBridge = is_Specific_bridge(),
   if
     IsSpecificBridge == false ->
-      produce_kafka_payload(ClientId, Content)
+      produce_kafka_payload(ClientId, Content);
+    true->
+      ?LOG_INFO("[KAFKA PLUGIN]The delivered operation is not bridge,client(~s),message: ~p~n", [ClientId, emqx_message:format(Message)]) 
   end,
   ok.
 
@@ -269,7 +275,9 @@ on_message_acked(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
   IsSpecificBridge = is_Specific_bridge(),
   if
     IsSpecificBridge == false ->
-      produce_kafka_payload(ClientId, Content)
+      produce_kafka_payload(ClientId, Content);
+    true->
+      ?LOG_INFO("[KAFKA PLUGIN]The acked operation is not bridge,client(~s),message: ~p~n", [ClientId, emqx_message:format(Message)]) 
   end,
   ok.
 
