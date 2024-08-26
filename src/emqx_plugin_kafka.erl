@@ -222,7 +222,7 @@ on_message_publish(Message, _Env) ->
         TmpBool_2 == true->
           produce_specify_payload(ClientId, Payload);
         true ->
-          produce_kafka_payload(ClientId, Payload)
+          ?LOG_INFO("[KAFKA PLUGIN]The publish operation is not bridge,client(~s),Topic: ~p~n, message: ~p~n", [ClientId, Topic, Payload])
       end;
     true ->
       produce_kafka_payload(ClientId, Payload)
