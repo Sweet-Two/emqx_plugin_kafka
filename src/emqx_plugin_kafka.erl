@@ -211,8 +211,11 @@ on_message_publish(Message, _Env) ->
     IsSpecificBridge == true ->
       {ok, Bridge_Topic_1} = application:get_env(emqx_plugin_kafka, bridge_mqtt_topic_1),
       {ok, Bridge_Topic_2} = application:get_env(emqx_plugin_kafka, bridge_mqtt_topic_2),
-      TmpBool_1 = string:equal(string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_1)), erlang:binary_to_list(Bridge_Topic_1)),
-      TmpBool_2 = string:equal(string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_2)), erlang:binary_to_list(Bridge_Topic_2)),
+      Cur_Topic_1 = erlang:binary_to_list(Bridge_Topic_1),
+      Cur_Topic_2 = erlang:binary_to_list(Bridge_Topic_2),
+      Cur_Topic = erlang:binary_to_list(Topic),
+      TmpBool_1 = string:equal(string:left(Cur_Topic, erlang:length(Cur_Topic_1)), Cur_Topic_1),
+      TmpBool_2 = string:equal(string:left(Cur_Topic, erlang:length(Cur_Topic_2)), Cur_Topic_2),
       if
         TmpBool_1 == true->
           produce_specify_payload(ClientId, Payload);
