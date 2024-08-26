@@ -207,18 +207,18 @@ on_message_publish(Message, _Env) ->
     IsSpecificBridge == true ->
       {ok, Bridge_Topic_1} = application:get_env(emqx_plugin_kafka, bridge_mqtt_topic_1),
       {ok, Bridge_Topic_2} = application:get_env(emqx_plugin_kafka, bridge_mqtt_topic_2),
-      case string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_1)) of
-          Bridge_Topic_1 -> 
-          produce_specify_payload(ClientId, Payload) 
-      end,
-      case string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_2)) of
-          Bridge_Topic_2 ->  
-          produce_specify_payload(ClientId, Payload) 
+      TmpBool_1 = string:equal(string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_1)), Bridge_Topic_1),
+      TmpBool_2 = string:equal(string:left(erlang:binary_to_list(Topic), erlang:length(Bridge_Topic_2)), Bridge_Topic_2),
+      if
+        TmpBool_1 == true->
+          produce_specify_payload(ClientId, Payload);
+        TmpBool_2 == true->
+          produce_specify_payload(ClientId, Payload);
+        true ->
+          produce_kafka_payload(ClientId, Payload)
       end;
-      
-    IsSpecificBridge == false ->
-      produce_kafka_payload(ClientId, Payload) 
-
+    true ->
+      produce_kafka_payload(ClientId, Payload)
   end,
   ok.
 %%---------------------message publish stop----------------------%%
@@ -321,10 +321,10 @@ kafka_init(_Env) ->
   {ok, _} = application:ensure_all_started(brod),
   ok = brod:start_client(AddressList, emqx_repost_worker, KafkaConfig),
   if 
-       IsSpecificBridge == false -> 
-       ok = brod:start_producer(emqx_repost_worker, KafkaTopic, []);
        IsSpecificBridge == true -> 
-       ok = brod:start_producer(emqx_repost_worker, SpecificKafkaTopic, [])
+        ok = brod:start_producer(emqx_repost_worker, SpecificKafkaTopic, []);
+       true -> 
+        ok = brod:start_producer(emqx_repost_worker, KafkaTopic, [])
   end,
  
   ?LOG_INFO("Init emqx plugin kafka successfully.....~n"),
